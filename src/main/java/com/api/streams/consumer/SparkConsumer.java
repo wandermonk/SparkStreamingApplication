@@ -4,8 +4,10 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
+
 import kafka.serializer.StringDecoder;
 
+import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.spark.SparkConf;
 import org.apache.spark.api.java.JavaPairRDD;
 import org.apache.spark.api.java.JavaSparkContext;
@@ -16,6 +18,9 @@ import org.apache.spark.streaming.kafka.KafkaUtils;
 import org.apache.spark.streaming.Duration;
 import org.apache.spark.streaming.Time;
 
+import com.api.streams.domains.Person;
+import com.api.streams.producer.ProducerUtilities;
+
 public class SparkConsumer {
 
 	private static SparkConf conf;
@@ -23,42 +28,31 @@ public class SparkConsumer {
 	private static JavaStreamingContext ssc;
 	private static final Map<String, String> kafkaParams = new HashMap<String, String>();
 
-	public static void main(String[] args) throws InterruptedException {
+	public static void execute() throws InterruptedException {
 
 		conf = new SparkConf().setAppName("Kafka-Spark-Streaming-Application")
 				.setMaster("local[*]");
 		sc = new JavaSparkContext(conf);
 		ssc = new JavaStreamingContext(sc, new Duration(1000));
 
-		kafkaParams.put("metadata.broker.list", "localhost:9092");
-		Set<String> topics = Collections.singleton("test");
+		kafkaParams
+				.put("metadata.broker.list",
+						"cstg-sa-stg-drc-03:9092,cstg-sa-stg-drc-04:9092,cstg-sa-stg-drc-05:9092");
+		Set<String> topics = Collections.singleton("jason");
 
 		JavaPairInputDStream<String, String> directKafkaStream = KafkaUtils
 				.createDirectStream(ssc, String.class, String.class,
 						StringDecoder.class, StringDecoder.class, kafkaParams,
 						topics);
 
-		directKafkaStream.foreachRDD(new VoidFunction2<JavaPairRDD<String, String>,Time>(){
-
-			/**
-			 * serial version uuid
-			 */
-			private static final long serialVersionUID = 1L;
-
-			@Override
-			public void call(JavaPairRDD<String, String> rdd, Time time)
-					throws Exception {
-				
-				rdd.foreach(data -> {
-					System.out.println(data._1 + "  " + data._2);
+		directKafkaStream
+				.foreachRDD(rdd -> {
+					System.out.println("Rdd with Partition size "+rdd.partitions().size());
+					System.out.println("Rdd with Record count "+rdd.count());
+					
+					rdd.foreach(record -> System.out.println("The record1 is "+record._1+" The record2 is "+record._2));
 				});
-			}
-			
-		});
 		ssc.start();
 		ssc.awaitTermination();
-
 	}
-
 }
-
